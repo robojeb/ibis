@@ -9,21 +9,21 @@ KERNEL_DIRECTORY=linux-$(KERNEL_VERSION)
 KERNEL_ARCHIVE=$(KERNEL_DIRECTORY).tar.xz
 KERNEL_URL=https://cdn.kernel.org/pub/linux/kernel/v$(KERNEL_MAJOR_VERSION).x/$(KERNEL_ARCHIVE)
 
-BINARIES=init
-
 .PHONY: all
-all: vmlinuz target/$(TARGET)
+all: vmlinuz initramfs
 
 .PHONY: rust_build
 rust_build: 
 	cargo build --all --target=$(TARGET)
 
 # Clean only the rust dependencies
+.PHONY: clean
 clean: 
 	cargo clean
 	rm -rf ./rfs ./rfs_update initramfs
 
 # Clean rust and Linux dependencies
+.PHONY: cleaner
 cleaner: clean
 	rm -rf $(KERNEL_ARCHIVE) $(KERNEL_DIRECTORY) vmlinuz
 
