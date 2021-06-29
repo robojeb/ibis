@@ -11,7 +11,7 @@ explaining what I learned and how someone else can recreate it.
 
 # Tutorials
 
-1. [Getting set-up and the world's worst init](tutorials/01_setup_and_bad_init.html) (Coming soon™)
+1. [Getting set-up and the world's worst init](tutorials/01_setup_and_bad_init.html)
 
 # FAQ
 
