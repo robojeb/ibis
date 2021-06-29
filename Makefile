@@ -47,12 +47,13 @@ build_initramfs: $(wildcard rfs/**/*)
 	cd rfs && find . | cpio -o --format=newc > ../initramfs
 
 .PHONY: rfs
-rfs: rust_build rfs_update
+rfs: | rust_build rfs_update
 
-rfs_update: $(wildcard rfs_template/**/*) $(wildcard target/$(TARGET)/debug/**/*)
-	cp -r rfs_template rfs
+rfs_update: $(wildcard rfs_template/*) $(wildcard target/$(TARGET)/debug/**/*)
+	mkdir -p rfs
+	cp -r rfs_template/* rfs/
 	cp ./target/$(TARGET)/debug/init ./rfs/
-# Keep track of when we last updated the RFS so that we can 
+# Keep track of when we last updated the RFS so that we can build properly
 	touch rfs_update
 
 #
