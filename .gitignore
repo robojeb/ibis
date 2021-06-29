@@ -1,0 +1,8 @@
+# Don't commit any build items or Linux information
+/linux-5.13
+/linux-5.13.tar.xz
+/rfs
+vmlinuz
+initramfs
+rfs_update
+/target
