@@ -423,7 +423,7 @@ so when we execute `make` without an argument.
 things that build quickly. I feel its too costly to remove the Linux source every 
 time I want to do a clean build. 
 
-If I really want to delete everythign I put in the `cleaner` command. 
+If I really want to delete everything I put in the `cleaner` command. 
 
 # Where to go from here?
 
