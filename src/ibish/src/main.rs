@@ -29,8 +29,19 @@ fn main() {
         match parsed_line.as_slice() {
             // Leave the shell, ignore any other arguments
             ["exit", ..] => std::process::exit(0),
+            &[] => {} // Empty line nothing to do
             _ => {
-                println!("Unknown input: {}", line_buf);
+                // Line isn't empty and isn't a keyword, try to resolve the items
+                // Its safe to get this item (eg no panic) because we didn't match the empty
+                // slice pattern, so there is at least one item.
+                let path_or_name = parsed_line[0];
+                let args = &parsed_line[1..];
+
+                let mut child_process = std::process::Command::new(path_or_name)
+                    .args(args.iter())
+                    .spawn()
+                    .unwrap();
+                child_process.wait().unwrap();
             }
         }
 
