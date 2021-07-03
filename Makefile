@@ -53,6 +53,7 @@ rfs_update: $(wildcard rfs_template/*) $(wildcard target/$(TARGET)/debug/**/*)
 	mkdir -p rfs
 	cp -r rfs_template/* rfs/
 	cp ./target/$(TARGET)/debug/init ./rfs/
+	cp ./target/$(TARGET)/debug/ibish ./rfs/
 # Keep track of when we last updated the RFS so that we can build properly
 	touch rfs_update
 
