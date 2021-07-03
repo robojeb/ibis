@@ -10,8 +10,9 @@ explaining what I learned and how someone else can recreate it.
 
 
 # Tutorials
-
+## A Barebones System
 1. [Getting set-up and the world's worst init](tutorials/01_setup_and_bad_init.html)
+1. [Going Interactive](tutorials/02_going_interactive.html)
 
 # FAQ
 
