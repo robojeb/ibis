@@ -438,4 +438,6 @@ utilities like `ls` and `cat`.
 
 Next issue we will put together a battle plan and start with the utility programs. 
 
-
+[Home](https://robojeb.github.io/ibis)
+-->
+[Next](https://robojeb.github.io/ibis/tutorials/02_going_interactive.html)
