@@ -396,3 +396,9 @@ From there we will start building some other core utilities and upgrade both our
 `init` and `ibish` shell. 
 
 Stay tuned, same Bat-time, same Bat-channel. 
+
+[Previous](https://robojeb.github.io/ibis/tutorials/01_setup_and_bad_init.html)
+<--
+[Home](https://robojeb.github.io/ibis)
+-->
+[Next (Coming Eventually)](#)
