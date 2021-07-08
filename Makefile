@@ -9,12 +9,29 @@ KERNEL_DIRECTORY=linux-$(KERNEL_VERSION)
 KERNEL_ARCHIVE=$(KERNEL_DIRECTORY).tar.xz
 KERNEL_URL=https://cdn.kernel.org/pub/linux/kernel/v$(KERNEL_MAJOR_VERSION).x/$(KERNEL_ARCHIVE)
 
+RUST_USE_DEFAULT_FEATURES=true
+
+# Add features to enable for each program (using cargo feature syntax)
+RUST_FEATURES=
+RUST_FEATURES+= init/verbose_debug
+
+CARGO_FLAGS=--all --target=$(TARGET)
+
+# Turn off default package features
+ifeq ($(RUST_USE_DEFAULT_FEATURES), false)
+	CARGO_FLAGS+= --no-default-features
+endif
+
+ifneq ($(RUST_FEATURES),)
+	CARGO_FLAGS+= --features "$(RUST_FEATURES)"
+endif
+
 .PHONY: all
 all: vmlinuz initramfs
 
 .PHONY: rust_build
 rust_build: 
-	cargo build --all --target=$(TARGET)
+	cargo build $(CARGO_FLAGS)
 
 # Clean only the rust dependencies
 .PHONY: clean

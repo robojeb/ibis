@@ -1,9 +1,10 @@
-use std::borrow::Cow;
+// Supress unused include warnings when the feature is disabled
 #[cfg(feature = "customizable_logo")]
-use std::{fs::File, io::Read};
+use std::{borrow::Cow, fs::File, io::Read};
 
 use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
 
+/// The default Ibis logo
 const DEFAULT_BANNER_LOGO: &'static str = r#" _____ _     _     
 |_   _| |   (_)    
   | | | |__  _ ___ 
@@ -39,9 +40,10 @@ fn get_boot_banner_logo() -> Cow<'static, str> {
     }
 }
 
+/// Load the default Ibis logo
 #[cfg(not(feature = "customizable_logo"))]
-fn get_boot_banner_logo() -> Cow<'static, str> {
-    Cow::Borrowed(DEFAULT_BANNER_LOGO)
+fn get_boot_banner_logo() -> &'static str {
+    DEFAULT_BANNER_LOGO
 }
 
 #[cfg(feature = "verbose_debug")]
@@ -72,10 +74,16 @@ fn on_shutdown_request() {
     }
 }
 
+fn print_boot_banner_info() {
+    let logo = get_boot_banner_logo();
+    println!("{}", logo);
+}
+
 fn main() {
     // Let's make sure we are PID 1, we're not designed to do anything else.
     if std::process::id() != 1 {
         println!("This process must be run as PID 1 (init)");
+        // Exit with an error
         std::process::exit(1);
     }
 
@@ -91,10 +99,7 @@ fn main() {
         unrecoverable_error("Could not disable signals");
     }
 
-    // Get and print a logo indicating that we are booting
-    let logo = get_boot_banner_logo();
-    println!("{}", logo);
-    println!("\tv{}", env!("CARGO_PKG_VERSION"));
+    print_boot_banner_info();
 
     // We need a PATH or `ibish` won't work :(
     std::env::set_var("PATH", DEFAULT_PATH);
