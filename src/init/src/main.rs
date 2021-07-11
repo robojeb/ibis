@@ -2,8 +2,6 @@
 #[cfg(feature = "customizable_logo")]
 use std::{borrow::Cow, fs::File, io::Read};
 
-use nix::sys::signal::{sigprocmask, SigSet, SigmaskHow};
-
 /// The default Ibis logo
 const DEFAULT_BANNER_LOGO: &'static str = r#" _____ _     _     
 |_   _| |   (_)    
@@ -85,18 +83,6 @@ fn main() {
         println!("This process must be run as PID 1 (init)");
         // Exit with an error
         std::process::exit(1);
-    }
-
-    // Before we get too far, we should disable signals and other items like
-    // Ctrl-Alt-Delete to reboot. Later we can reenable things we want to handle
-    // as we get that set up properly.
-    if let Err(_error) = nix::sys::reboot::set_cad_enabled(false) {
-        unrecoverable_error("Could not disable Ctrl-Alt-Delete");
-    }
-
-    let signal_set = SigSet::all();
-    if let Err(_error) = sigprocmask(SigmaskHow::SIG_SETMASK, Some(&signal_set), None) {
-        unrecoverable_error("Could not disable signals");
     }
 
     print_boot_banner_info();
