@@ -12,7 +12,9 @@ Our goals will be the following:
 * Break our code into some modules
 * Remove panicking calls like `unwrap()` and properly handle errors
 * Clean up our `main()` function
+* Add a function for if something goes horribly wrong
 * Figure out how to properly terminate the system
+* Adding some documentation comments to our functions and data
 
 [Full code for this post here](#)
 
@@ -30,7 +32,7 @@ touch shutdown.rs
 Then we can bring these modules into the program
 
 ```Rust
-// main.rs: Near the top
+// init/main.rs: Near the top
 mod boot;
 mod debug;
 mod defaults;
@@ -44,10 +46,11 @@ In the following sections we will start moving code into these modules.
 The first thing that is very likely to crash is the custom `logo.txt` feature we 
 added in the first post. 
 First lets start by refactoring our boot banner code out to a function in our 
-new boot module: 
+new boot module.
 
 ```Rust
-// boot.rs
+// init/boot.rs
+/// Print out useful information during boot including a nice logo
 pub fn print_boot_banner_info() {
     let mut logo_file = File::open("/logo.txt").unwrap();
     let mut buffer = String::new();
@@ -56,8 +59,12 @@ pub fn print_boot_banner_info() {
 
     println!("Hello, Ibis!\n{}", buffer);
 }
+```
 
-// main.rs
+Then we can call this function from our main using the relative module path.
+
+```Rust
+// init/main.rs
 fn main() {
     // ... 
     //let mut logo_file = File::open("/logo.txt").unwrap();
@@ -71,20 +78,21 @@ fn main() {
 }
 ```
 
-This is still cleaner, but still has a lot of potential to crash. 
+This is cleaner, but still has a lot of potential to crash. 
 We can handle getting a string to print as the boot banner in a function as well. 
 Factoring this out just helps make it cleaner if we want to add more information
 to our boot banner later. 
 
 ```Rust
-fn get_boot_banner_logo() -> String {
+// init/boot.rs
+pub fn get_boot_banner_logo() -> String {
     let mut logo_file = File::open("/logo.txt").unwrap();
     let mut buffer = String::new();
     logo_file.read_to_string(&mut buffer).unwrap();
     buffer
 }
 
-fn print_boot_banner_info() {
+pub fn print_boot_banner_info() {
     let logo = get_boot_banner_logo();
     println!("{}", logo);
 }
@@ -93,8 +101,10 @@ fn print_boot_banner_info() {
 Now we can add error handling to our function for getting the logo. 
 We will also add a fallback to a built-in logo if we cant get the user defined
 one for any reason.
+Lets put this logo in `defaults.rs`.
 
 ```Rust
+// init/defaults.rs
 /// The default Ibis logo
 const DEFAULT_BANNER_LOGO: &'static str = r#" _____ _     _     
 |_   _| |   (_)    
@@ -102,11 +112,19 @@ const DEFAULT_BANNER_LOGO: &'static str = r#" _____ _     _
   | | | '_ \| / __|
  _| |_| |_) | \__ \
  \___/|_.__/|_|___/"#;
+```
+
+Then our function can return the default logo if either opening or reading the 
+file returns an error. 
+
+```Rust
+// init/boot.rs
+use crate::defaults;
 
 /// Try to load the logo provided by a user from `/logo.txt`
 ///
 /// If this file cannot be found or read, this will provide a default logo
-/// from `DEFAULT_BANNER_LOGO`.
+/// from `defaults::DEFAULT_BANNER_LOGO`.
 fn get_boot_banner_logo() -> Cow<'static, str> {
     match File::open("/logo.txt") {
         Ok(mut logo_file) => {
@@ -114,10 +132,10 @@ fn get_boot_banner_logo() -> Cow<'static, str> {
             if let Ok(_) = logo_file.read_to_string(&mut buffer) {
                 Cow::Owned(buffer)
             } else {
-                Cow::Borrowed(DEFAULT_BANNER_LOGO)
+                Cow::Borrowed(defaults::DEFAULT_BANNER_LOGO)
             }
         }
-        Err(_) => Cow::Borrowed(DEFAULT_BANNER_LOGO),
+        Err(_) => Cow::Borrowed(defaults::DEFAULT_BANNER_LOGO),
     }
 }
 ```
@@ -136,6 +154,7 @@ to keep it, but everyone else will just use the built-in function.
 First we have to edit our `Cargo.toml` for the `init` project. 
 
 ```Toml
+# init/Cargo.toml
 # Add the following
 [features]
 default = [] # No default features
@@ -148,12 +167,16 @@ that we can pass as a build option.
 We can then use this feature to conditionally compile our function: 
 
 ```Rust
+// init/boot.rs
+#[cfg(feature = "customizable_logo")]
+use std::{borrow::Cow, fs::File, io::Read};
+
 /// Try to load the logo provided by a user from `/logo.txt`
 ///
 /// If this file cannot be found or read, this will provide a default logo
 /// from `DEFAULT_BANNER_LOGO`.
 #[cfg(feature = "customizable_logo")]
-fn get_boot_banner_logo() -> Cow<'static, str> {
+pub fn get_boot_banner_logo() -> Cow<'static, str> {
     /// *snip*
 }
 ```
@@ -161,9 +184,10 @@ fn get_boot_banner_logo() -> Cow<'static, str> {
 We also need to provide an alternate version when the feature isn't enabled. 
 
 ```Rust
+// init/boot.rs
 /// Load the default Ibis logo
 #[cfg(not(feature = "customizable_logo"))]
-fn get_boot_banner_logo() -> &'static str {
+pub fn get_boot_banner_logo() -> &'static str {
     DEFAULT_BANNER_LOGO
 }
 ```
@@ -175,7 +199,59 @@ type will successfully typecheck where we use the function in `print_boot_banner
 
 # `make`-ing Cargo features
 
--TODO-
+There are two ways to enable a feature with Cargo. The first is to add the
+feature to the dependency list when using a library. This obviously won't work
+for our binaries so we can use method two, the `--feature` flag when building. 
+
+Because we are using `make` we are going to have to add some rules to our Makefile
+so that Cargo will appropriately build. 
+
+First lets edit our `rust_build` rule.
+
+```Makefile
+.PHONY: rust_build
+rust_build: 
+	cargo build $(CARGO_FLAGS)
+```
+
+Then we can add some logic to manipulate our new `CARGO_FLAGS` variable. 
+
+```Makefile
+# Should we use the default features for the binaries
+RUST_USE_DEFAULT_FEATURES=true
+
+# Should we build in debug or release mode
+RUST_DEBUG_BUILD=true
+
+# Add features to enable for each program (using cargo feature syntax)
+RUST_FEATURES=
+
+CARGO_FLAGS=--all --target=$(TARGET)
+
+# Turn off default package features
+ifeq ($(RUST_USE_DEFAULT_FEATURES), false)
+	CARGO_FLAGS+= --no-default-features
+endif
+
+ifneq ($(RUST_DEBUG_BUILD), true)
+	CARGO_FLAGS+= --release
+endif
+
+ifneq ($(RUST_FEATURES),)
+	CARGO_FLAGS+= --features "$(RUST_FEATURES)"
+endif
+```
+
+Now we have a few flags we can tweak to control the Cargo build.
+First we can turn on or off the default features enabled with all the binaries. 
+Right now this doesn't do much because we have no default features. 
+Second we can enable or disable debug build. 
+Finally we can add features as we want, for example if we wanted the `customizable_logo`
+feature we would add 
+
+```Makefile
+RUST_FEATURES+= init/customizable_logo
+```
 
 # A Little More Cleanup: Being PID 1, and the default PATH
 
@@ -186,6 +262,7 @@ Lets add a quick check at the top of `main()` before we do anything else
 to be sure we are actually PID 1. 
 
 ```Rust
+// init/main.rs
 fn main() {
     // Let's make sure we are PID 1, we're not designed to do anything else.
     if std::process::id() != 1 {
@@ -202,13 +279,17 @@ we set the path.
 We can also add a constant to define the default `PATH`. 
 
 ```Rust
+// init/defaults.rs
 /// Set the defaults for the PATH variable we want to set up
 const DEFAULT_PATH: &'static str = "/sbin;/bin";
 
+// init/main.rs
 // Inside `main()`
 //...
     // We need a PATH or `ibish` won't work :(
-    std::env::set_var("PATH", DEFAULT_PATH);
+    std::env::set_var("PATH", defaults::DEFAULT_PATH);
 //...
 ```
+
+# Shutdown and a Five-star crash rating
 
