@@ -1,81 +1,7 @@
-// Supress unused include warnings when the feature is disabled
-#[cfg(feature = "customizable_logo")]
-use std::{borrow::Cow, fs::File, io::Read};
-
-/// The default Ibis logo
-const DEFAULT_BANNER_LOGO: &'static str = r#" _____ _     _     
-|_   _| |   (_)    
-  | | | |__  _ ___ 
-  | | | '_ \| / __|
- _| |_| |_) | \__ \
- \___/|_.__/|_|___/"#;
-
-const DEFAULT_PATH: &'static str = "/sbin;/bin";
-
-fn unrecoverable_error<M: std::fmt::Display>(msg: M) {
-    println!("init has encountered a serious error:\n\t{}\n\nPlease report a bug and reboot your system.", msg);
-    #[cfg(feature = "verbose_debug")]
-    debug_dump_env();
-    loop {}
-}
-
-/// Try to load the logo provided by a user from `/logo.txt`
-///
-/// If this file cannot be found or read, this will provide a default logo
-/// from `DEFAULT_BANNER_LOGO`.
-#[cfg(feature = "customizable_logo")]
-fn get_boot_banner_logo() -> Cow<'static, str> {
-    match File::open("/logo.txt") {
-        Ok(mut logo_file) => {
-            let mut buffer = String::new();
-            if let Ok(_) = logo_file.read_to_string(&mut buffer) {
-                Cow::Owned(buffer)
-            } else {
-                Cow::Borrowed(DEFAULT_BANNER_LOGO)
-            }
-        }
-        Err(_) => Cow::Borrowed(DEFAULT_BANNER_LOGO),
-    }
-}
-
-/// Load the default Ibis logo
-#[cfg(not(feature = "customizable_logo"))]
-fn get_boot_banner_logo() -> &'static str {
-    DEFAULT_BANNER_LOGO
-}
-
-#[cfg(feature = "verbose_debug")]
-fn debug_dump_env() {
-    for (var, value) in std::env::vars() {
-        println!("{}: {}", var, value);
-    }
-}
-
-fn on_shutdown_request() {
-    println!("Terminating all processes");
-    // Setting PID to -1 indicates we want to kill every process we have
-    // permission to do so (man 3 kill). In this case it should be everything
-    // because we are `init`
-    if let Err(_error) = nix::sys::signal::kill(
-        nix::unistd::Pid::from_raw(-1),
-        nix::sys::signal::Signal::SIGTERM,
-    ) {
-        println!("Failure trying to kill processes during shutdown");
-    }
-
-    // Per the documentaiton (`man 3 reboot`) we must issue a `sync` prior
-    // to using `RB_POWER_OFF` or else we could lose data.
-    // This would make our users very unhappy
-    nix::unistd::sync();
-    if let Err(_error) = nix::sys::reboot::reboot(nix::sys::reboot::RebootMode::RB_POWER_OFF) {
-        unrecoverable_error("Could not initiate shutdown");
-    }
-}
-
-fn print_boot_banner_info() {
-    let logo = get_boot_banner_logo();
-    println!("{}", logo);
-}
+mod boot;
+mod debug;
+mod defaults;
+mod shutdown;
 
 fn main() {
     // Let's make sure we are PID 1, we're not designed to do anything else.
@@ -85,15 +11,20 @@ fn main() {
         std::process::exit(1);
     }
 
-    print_boot_banner_info();
+    boot::print_boot_banner_info();
 
     // We need a PATH or `ibish` won't work :(
-    std::env::set_var("PATH", DEFAULT_PATH);
+    std::env::set_var("PATH", defaults::DEFAULT_PATH);
 
     loop {
-        // Infinitely respawn shells
-        let mut child = std::process::Command::new("/ibish").spawn().unwrap();
-        child.wait().unwrap();
-        on_shutdown_request();
+        // Spawn one shell and then shutdown
+        if let Ok(mut child) = std::process::Command::new("/ibish").spawn() {
+            match child.wait() {
+                Ok(_) => {} //Nothing to do
+                Err(_) => println!("Error waiting for child to terminate"),
+            }
+            // initiate shutdown.
+            shutdown::on_shutdown_request();
+        }
     }
 }
