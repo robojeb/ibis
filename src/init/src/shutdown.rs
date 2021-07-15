@@ -9,7 +9,7 @@ use crate::debug::unrecoverable_error;
 pub fn on_shutdown_request() {
     println!("Terminating all processes");
     // Setting PID to -1 indicates we want to kill every process we have
-    // permission to do so (man 3 kill). In this case it should be everything
+    // permission to do so (man 2 kill). In this case it should be everything
     // because we are `init`
     if let Err(_error) = nix::sys::signal::kill(
         nix::unistd::Pid::from_raw(-1),
@@ -18,7 +18,7 @@ pub fn on_shutdown_request() {
         println!("Failure trying to kill processes during shutdown");
     }
 
-    // Per the documentaiton (`man 3 reboot`) we must issue a `sync` prior
+    // Per the documentaiton (`man 2 reboot`) we must issue a `sync` prior
     // to using `RB_POWER_OFF` or else we could lose data.
     // This would make our users very unhappy
     nix::unistd::sync();
