@@ -7,7 +7,6 @@ edition = "2018"
 
 [features]
 default = []
-verbose_debug = []
 customizable_logo = []
 
 [dependencies]
