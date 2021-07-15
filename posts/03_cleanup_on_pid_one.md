@@ -293,3 +293,133 @@ const DEFAULT_PATH: &'static str = "/sbin;/bin";
 
 # Shutdown and a Five-star crash rating
 
+The last things on our list of cleanup activities is a clean shutdown and 
+something to handle when we can't recover from a crash. 
+
+Let us start with a crash handler, in our `debug.rs` file we can do the following.
+
+```Rust
+// init/debug.rs
+
+/// Fall into an unrecoverable state and display a helpful message
+///
+/// This function should be called with a helpful message when the `init`
+/// program cannot recover from an error it has encountered.
+/// This will spin forever right now.
+pub fn unrecoverable_error<M: std::fmt::Display>(msg: M) {
+    println!("init has encountered a serious error.\n\t{}\n\nPlease report a bug and reboot your system.", msg);
+    loop {}
+}
+```
+
+This is good enough for now, it lets us tell the user that something is wrong
+and won't crash the kernel by terminating `init`. 
+Later we can add more debugging features as we need them. 
+
+Next we can tackle shutting down, to do this we are going to bring in our first
+dependency, the [`nix`](https://crates.io/crates/nix) crate. `nix` creates safe
+bindings to Linux (and other Unix style) system calls and C library functions. 
+
+```Toml
+# init/Cargo.toml
+
+[dependencies]
+nix = "0.22"
+```
+
+We are particularly interested in the function 
+[`nix::sys::reboot::reboot()`](https://docs.rs/nix/0.22.0/nix/sys/reboot/fn.reboot.html)
+which handles rebooting and shutting down the system. 
+We can look up this function's system call reference with the `man` Manpage program, 
+We have to be aware to look in the correct Manpage section because there is also
+a program called `reboot`, in this case we want the second section "2: Syscalls".
+
+```
+man 2 reboot
+```
+
+This manual entry has a lot of useful information about shutting down and rebooting 
+the system. It gives us two critical pieces of information: 
+
+1. The command we want to issue to shut-down is `RB_POWER_OFF`. 
+1. Before we shutdown we need to issue a `sync()` or we can lose data. 
+
+At this time we don't have any persistant storage set-up, but it is a good idea
+to follow all the safety rules before we forget and get angry bug reports later. 
+
+Finally there is one last thing we will want to do when we shutdown. Signal to 
+every process that they should terminate gracefully if they can. 
+Lets put all this together into a new function. 
+
+```Rust
+// init/shutdown.rs
+use crate::debug::unrecoverable_error;
+
+/// Perform a graceful shutdown of the system
+///
+/// There are several stages here:
+///  1. Terminate all processes in the system
+///  2. Sync the filesystem
+///  3. Inform the kernel to shutdown and power-off
+pub fn on_shutdown_request() {
+    println!("Terminating all processes");
+    // Setting PID to -1 indicates we want to kill every process we have
+    // permission to do so (man 3 kill). In this case it should be everything
+    // because we are `init`
+    if let Err(_error) = nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(-1),
+        nix::sys::signal::Signal::SIGTERM,
+    ) {
+        println!("Failure trying to kill processes during shutdown");
+    }
+
+    // Per the documentaiton (`man 3 reboot`) we must issue a `sync` prior
+    // to using `RB_POWER_OFF` or else we could lose data.
+    // This would make our users very unhappy
+    nix::unistd::sync();
+    if let Err(_error) = nix::sys::reboot::reboot(nix::sys::reboot::RebootMode::RB_POWER_OFF) {
+        unrecoverable_error("Could not initiate shutdown");
+    }
+}
+```
+
+Let's break this down into the three parts in the documentation comment. 
+First, we try to tell every process in the system that they should terminate. 
+We do this by sending `SIGTERM` to the `-1` pid. From the `man 2 kill` page: 
+
+> If pid equals -1, then sig is sent to every process for which the calling process has permission to send signals, except for process 1 (init), but see below.
+
+This is convenient because as `init` we should have permissions to send this signal
+to every other process in the system. 
+If for some reason this fails, we print a message for the user before moving on. 
+
+Next we issue a `sync()` command as specified in the documentation for `shutdown()`. 
+
+Finally we issue a `reboot()` system call, asking for the system to power-down.
+If this fails we could theoretically just crash, because we were going to 
+shut-down anyway, but as a courtesy to the user we are going to use our new
+error function to print a helpful error message and hang. 
+
+We can finally tie this all together and give ourselves a clean shutdown. 
+For the moment we don't have a way send any signals to our `init` so instead we 
+will just initiate shutdown after our shell goes away. 
+
+```Rust
+// init/main.rs
+
+fn main() {
+    // *snip*
+    loop {
+        // Spawn one shell and then shutdown
+        if let Ok(mut child) = std::process::Command::new("/ibish").spawn() {
+            match child.wait() {
+                Ok(_) => {} //Nothing to do
+                Err(_) => println!("Error waiting for child to terminate"),
+            }
+            // initiate shutdown.
+            shutdown::on_shutdown_request();
+        }
+    }
+}
+```
+
