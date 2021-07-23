@@ -6,6 +6,8 @@ some core programs.
 One of the most important is the shell, this will let us interactively call other 
 programs as we create them. 
 
+[Full code for this post here](https://github.com/robojeb/ibis/tree/Section1Post2)
+
 Lets start by creating a project for our shell, we will call it `ibish` because it is
 the "Ibis shell".  
 
@@ -33,6 +35,7 @@ reads a line of text, and echo's that text back.
 I will show the full text below and then explain each part. 
 
 ```Rust
+// ibish/main.rs
 // (1)
 use std::io::{BufRead, Write};
 
@@ -95,6 +98,7 @@ Before we try hooking it into our project lets add some basic actions.
 We'll replace the line which echos with some really basic logic: 
 
 ```Rust 
+// ibish/main.rs
         // Remove
         // stdout.write_all(line_buf.as_bytes()).unwrap();
 
@@ -129,6 +133,7 @@ Fortunately this is provided by the Rust implementation of `str` with the `.spli
 Lets create the line parsing function: 
 
 ```Rust
+// ibish/main.rs
 fn parse_line<'a>(line_buf: &'a str) -> Vec<&'a str> {
     //TODO: Parsing with escapes and quotes and other shell things
     line_buf.split_ascii_whitespace().collect()
@@ -173,6 +178,7 @@ executable in our initramfs.
 Next lets update `init` to spawn `ibish` as a child process: 
 
 ```Rust
+// init/main.rs
 // Update the inifinite loop
     loop {
         // Infinitely respawn shells
@@ -235,6 +241,7 @@ globs.
 To do this we can modify our `match` statement: 
 
 ```Rust
+// ibish/main.rs
     // Replace this
     //_ => {
     //    println!("Unknown input: {}", line_buf);
@@ -323,6 +330,7 @@ Lets quickly modify our `init` to print out what our environment looks like.
 At the top of `main()` lets add: 
 
 ```Rust
+// init/main.rs
 for (var, value) in std::env::vars() {
     println!("{}: {}", var, value);
 }
@@ -345,6 +353,7 @@ We can set up `PATH` pretty easily, above environment print loop lets add
 the following: 
 
 ```Rust
+// init/main.rs
 std::env::set_var("PATH", "/");
 ```
 We can try running this now: 

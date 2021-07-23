@@ -5,6 +5,8 @@ provide a minimal environment. We are going to jump over implementing `libc` at
 the beginning and start with `init`. 
 From there we will build up each component to allow us to have a useable system.
 
+[Full code for this post here](https://github.com/robojeb/ibis/tree/Section1Post1)
+
 # But first some setup
 
 Before we begin, we have to set-up our development environment. 
@@ -241,6 +243,7 @@ Turns out Linux doesn't like it when `init` goes away and will kernel panic.
 That is easy enough to fix, lets go modify `src/init/src/main.rs`: 
 
 ```rust
+// main.rs
 fn main() {
     println!("Hello, Ibis!");
     loop {}
@@ -291,6 +294,7 @@ super contrived but were just trying to take small steps)
 Lets modify the `main.rs` of our `init` program: 
 
 ```rust
+// main.rs
 use std::{
     io::Read,
     fs::File,
