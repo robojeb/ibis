@@ -1,23 +1,30 @@
-use std::{fs::File, io::Read};
+mod boot;
+mod debug;
+mod defaults;
+mod shutdown;
 
 fn main() {
-    // We need a PATH or `ibish` won't work :(
-    std::env::set_var("PATH", "/");
-
-    for (var, value) in std::env::vars() {
-        println!("{}: {}", var, value);
+    // Let's make sure we are PID 1, we're not designed to do anything else.
+    if std::process::id() != 1 {
+        println!("This process must be run as PID 1 (init)");
+        // Exit with an error
+        std::process::exit(1);
     }
 
-    let mut logo_file = File::open("/logo.txt").unwrap();
-    let mut buffer = String::new();
+    boot::print_boot_banner_info();
 
-    logo_file.read_to_string(&mut buffer).unwrap();
-
-    println!("Hello, Ibis!\n{}", buffer);
+    // We need a PATH or `ibish` won't work :(
+    std::env::set_var("PATH", defaults::DEFAULT_PATH);
 
     loop {
-        // Infinitely respawn shells
-        let mut child = std::process::Command::new("/ibish").spawn().unwrap();
-        child.wait().unwrap();
+        // Spawn one shell and then shutdown
+        if let Ok(mut child) = std::process::Command::new("/ibish").spawn() {
+            match child.wait() {
+                Ok(_) => {} //Nothing to do
+                Err(_) => println!("Error waiting for child to terminate"),
+            }
+            // initiate shutdown.
+            shutdown::on_shutdown_request();
+        }
     }
 }
